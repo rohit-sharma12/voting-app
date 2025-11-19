@@ -83,4 +83,69 @@ router.delete("/:candidateID", jwtAuthMiddleware, async (req, res) => {
     }
 });
 
+router.post('/vote/:candidateID', jwtAuthMiddleware, async (req, res) => {
+    candidateID = req.params.candidateID;
+    userID = req.user.id
+
+    try {
+        const candidate = await Candidate.findById(candidateID);
+        if (!candidate) {
+            return res.status(404).json({ message: "Candidate not found" })
+        }
+        const user = await User.findById(userID);
+        if (!user) {
+            return res.status(404).json({ message: "user not found" })
+        }
+        if (user.isVoted) {
+            res.status(404).json({ message: "You have already voted" })
+        }
+        if (user.role == "admin") {
+            res.status(403).json({ message: "admin is not allowed" })
+        }
+
+        candidate.votes.push({ user: userID });
+        candidate.voteCount++;
+        await candidate.save();
+
+        user.isVoted = true
+        await user.save(true);
+
+        res.status(200).json({ message: "Vote recorded successfully" })
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+})
+
+router.get('/vote/count', async (req, res) => {
+    try {
+        const candidate = await Candidate.find().sort({ voteCount: 'desc' });
+
+        const voteRecord = candidate.map((data) => {
+            return {
+                party: data.party,
+                count: data.voteCount
+            }
+        })
+
+        return res.status(200).json(voteRecord)
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+})
+
+router.get('/', async (req, res) => {
+    try {
+        const candidates = await Candidate.find({}, 'name party -_id');
+
+        res.status(200).json(candidates);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+})
+
+
 module.exports = router;
